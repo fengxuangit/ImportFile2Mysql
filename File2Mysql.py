@@ -17,6 +17,7 @@ class MysqlImport:
 		self.cursor = self.conn.cursor()
 
 	def executeInsert(self, sql):
+		print sql
 		try:
 			self.cursor.execute(sql)
 		except:
@@ -43,11 +44,22 @@ class File2Mysql:
 				break
 		return data
 
+	def ReplaceAll(self, text):
+		filters = {',':'', '[':'', ']':'', '"':'', '\n':'', '\r':''}
+		for sech, rep in filters.items():
+			text = text.replace(sech, rep)
+		return text
+
+	def GetOneline(self, files):
+		with open(files) as f:
+			data = f.readline()
+			return data.split(options.split)
+
 	def MixFile(self, files, table):
-		self.conn.executeInsert(writestruct(table)) # 建表
+		self.conn.executeInsert(self.writestruct(table)) # 建表
 		logging.info("CREATE table  success")
 		formt = self.Analysis(files)
-		prefix = "insert into {0}(".format(table)
+		prefix = "insert into `{0}`(".format(table)
 		suffix = "("
 		for key in sorted(formt):
 			prefix += "`{0}`,".format(key)
@@ -55,13 +67,13 @@ class File2Mysql:
 		with open(files) as f:
 			for line in f.readlines():
 				value = ""
-				data = line.split(sp)
+				data = line.split(options.split)
 				temp = copy.copy(data)
 				for key in sorted(formt):
 					pos = formt[key]
-					value += "\"{0}\",".format(ReplaceAll(data[pos]))
+					value += "\"{0}\",".format(self.ReplaceAll(data[pos]))
 					temp.pop(int(pos))
-				data = ReplaceAll(str(temp))
+				data = self.ReplaceAll(str(temp))
 				oneline = "{0} {1}\"{2}\")".format(prefix, value, data)	 #处理好sql语句 准备写入文件
 				self.conn.executeInsert(oneline)
 		logging.info("done!!!")
@@ -69,14 +81,14 @@ class File2Mysql:
 	def Analysis(self, files):
 		i = 0
 		form = {}
-		for line in GetOneline(files):
-			if emailreg.search(line):
+		for line in self.GetOneline(files):
+			if self.emailreg.search(line):
 				form['email'] = i
-			if passreg.search(line):
+			if self.passreg.search(line):
 				form['password'] = i
-			if ipreg.search(line):
+			if self.ipreg.search(line):
 				form['ip'] = i
-			if realname.search(line):
+			if self.realname.search(line):
 				form['name'] = i
 			i+=1
 		return form
@@ -139,9 +151,9 @@ class File2Mysql:
 						if value == line.split(options.split)[idpos]:  #如何这个值等于ID位置的值的话就pass
 							logging.warning("drop the `id` line ")
 							continue
-						temp += "\"{0}\",".format(value.replace('\n','')) #把值排好
+						temp += "\"{0}\",".format(self.ReplaceAll(value)) #把值排好
 					else:
-						sql += "`{0}`,".format(value.replace('\n',''))  #第一次循环的时候 把columns排好
+						sql += "`{0}`,".format(self.ReplaceAll(value))  #第一次循环的时候 把columns排好
 				if i >0 :
 					tmp = "{0})".format(temp[:-1]) #最后闭合括号
 					self.conn.executeInsert(tmp)  #mysql import todo 打印信息
