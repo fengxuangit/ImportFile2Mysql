@@ -44,7 +44,7 @@ class File2Mysql:
 		return data
 
 	def ReplaceAll(self, text):
-		filters = {',':'', '[':'', ']':'', '"':'', '\n':'', '\r':''}
+		filters = {',':'', '[':'', ']':'', '"':'', '\n':'', '\r':'', '\'':''}
 		for sech, rep in filters.items():
 			text = text.replace(sech, rep)
 		return text
@@ -167,19 +167,19 @@ class File2Mysql:
 		for column in columns:
 			sql += "`{0}`,".format(column)
 			i += 1
-			tmp=  ""
 		with open(options.file) as f:
 			for line in f.readlines():
-				temp = "{0}) values(".format(sql[:-1])
+				temp = "{0},other) values(".format(sql[:-1])
 				pos = 0 
+				tmp=  ""
 				for value in line.split(options.split):
-					if pos !== i:
+					if i > pos:
 						temp += "\"{0}\",".format(self.ReplaceAll(value))
+						print value
 					else:
 						tmp += "{0} ".format(self.ReplaceAll(value)) 
 					pos += 1
 				temp = "{0}\"{1}\")".format(temp, tmp)
-				print temp
 				self.conn.executeInsert(temp)
 				logging.info("Insert into {0} success".format(table))
 		logging.info("done!!!")
