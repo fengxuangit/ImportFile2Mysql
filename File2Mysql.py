@@ -56,8 +56,8 @@ class File2Mysql:
 
 	def MixFile(self, files, table):
 		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
-		self.conn.executeInsert(self.writestruct(table)) # 建表
-		logging.info("CREATE table  success")
+		self.conn.executeInsert(self.writestruct(table)) # 建 表
+		logging.info("CREATE table success")
 		formt = self.Analysis(files)
 		prefix = "insert into `{0}`(".format(table)
 		suffix = "("
@@ -93,7 +93,6 @@ class File2Mysql:
 			i+=1
 		return form
 
-
 	def writestruct(self, table):
 		sql = '''
 		CREATE TABLE IF NOT EXISTS `{0}` (
@@ -116,9 +115,7 @@ class File2Mysql:
 		'''.format(table).strip()
 		return sql
 
-
-	def SqlmapFile(self, files, table, columns=None):
-		data = columns if columns else self.columns(files)
+	def WriteDiystruct(self,table, data):
 		sql = '''CREATE TABLE IF NOT EXISTS `{0}` (`id` int(11) NOT NULL AUTO_INCREMENT,'''.format(table)
 		for line in data:
 			if line == 'id':
@@ -127,14 +124,18 @@ class File2Mysql:
 		suffix = '''PRIMARY KEY (`id`),KEY `searchku1_username_name_email` (`username`,`name`,`email`,`qq`)) 
 	ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=latin1;
 		'''.strip()
-		sql = "{0}{1}".format(sql, suffix)
-		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
+		sql = sql + suffix
 		self.conn.executeInsert(sql) # TODO 打印信息
+
+	def SqlmapFile(self,files, table):
+		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
+		data = self.columns(files)
+		self.WriteDiystruct(table, data)
 		logging.info("CREATE table  success")
 		self.insertsql(files, table)
 		logging.info("done!!!")
 
-	def insertsql(self,files, table, columns=None):
+	def insertsql(self,files, table):
 		sql = "insert into `{0}`(".format(table)
 		temp = ""
 		i = idpos = 0  # 在这里为1是判断是否为第一行
@@ -153,26 +154,47 @@ class File2Mysql:
 							logging.warning("drop the `id` line ")
 							continue
 						temp += "\"{0}\",".format(self.ReplaceAll(value)) #把值排好
-					elif columns != None and type(columns) == list:  #判断是否存在自定义列名	
-						for column  in columns:
-							sql += "`{0}`,".format(column) 
-						break
 					else:
-						sql += "`{0}`,".format(self.ReplaceAll(value)) 
+						sql += "`{0}`,".format(self.ReplaceAll(value))  #第一次循环的时候 把columns排好
 				if i >0 :
 					tmp = "{0})".format(temp[:-1]) #最后闭合括号
 					self.conn.executeInsert(tmp)  #mysql import todo 打印信息
 				i += 1
 
+	def InsertDiysql(self, table, columns):
+		sql = "insert into `{0}`(".format(table)
+		i =  0
+		for column in columns:
+			sql += "`{0}`,".format(column)
+			i += 1
+			tmp=  ""
+		with open(options.file) as f:
+			for line in f.readlines():
+				temp = "{0}) values(".format(sql[:-1])
+				pos = 0 
+				for value in line.split(options.split):
+					if pos !== i:
+						temp += "\"{0}\",".format(self.ReplaceAll(value))
+					else:
+						tmp += "{0} ".format(self.ReplaceAll(value)) 
+					pos += 1
+				temp = "{0}\"{1}\")".format(temp, tmp)
+				print temp
+				self.conn.executeInsert(temp)
+				logging.info("Insert into {0} success".format(table))
+		logging.info("done!!!")
 
-	def DiyColumns(self):
+	def DiyColumns(self, tablename):
+		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
 		columns = []
 		if options.column == None:
 			return None
 		else:
 			for line in options.column.split(options.split):
 				columns.append(line)
-			self.SqlmapFile(options.file, name, columns)
+			print columns
+			self.WriteDiystruct(tablename, columns)
+			self.InsertDiysql(tablename, columns)
 
 	def usage(self):
 		parser = OptionParser()  
@@ -193,9 +215,7 @@ class File2Mysql:
 		if options.logfile == None:
 			options.logfile = options.name[:options.name.find('.')] + '.log'
 		logging.basicConfig(level=logging.INFO, format='%(asctime)s %(filename)s %(levelname)s %(message)s',
-                datefmt='%a, %d %b %Y %H:%M:%S',
-                filename=options.logfile,
-                filemode='w')
+                datefmt='%a, %d %b %Y %H:%M:%S',filename=options.logfile,filemode='w')
 		console = logging.StreamHandler()
 		console.setLevel(logging.INFO)
 		formatter = logging.Formatter('%(asctime)s %(filename)s %(levelname)s %(message)s')
@@ -214,9 +234,10 @@ class File2Mysql:
 			if options.column == None:
 				self.MixFile(options.file, name)
 			else:
-				self.DiyColumns()
+				self.DiyColumns(name)
 		else:
 			self.SqlmapFile(options.file, name)
+			
 
 if __name__ == '__main__':
 	a = File2Mysql()
