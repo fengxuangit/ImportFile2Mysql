@@ -35,8 +35,7 @@ class File2Mysql:
 	passreg = re.compile('[\w]{32}|[\w]{40}|[\w]{16}')
 	ipreg = re.compile('([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})')
 	realname = re.compile(u'[\u4e00-\u9fa5]+')
-	conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
-
+	conn = None
 	def columns(self,files):
 		with open(files) as f:
 			for line in f.readlines():
@@ -56,6 +55,7 @@ class File2Mysql:
 			return data.split(options.split)
 
 	def MixFile(self, files, table):
+		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
 		self.conn.executeInsert(self.writestruct(table)) # 建表
 		logging.info("CREATE table  success")
 		formt = self.Analysis(files)
@@ -117,8 +117,8 @@ class File2Mysql:
 		return sql
 
 
-	def SqlmapFile(self,files, table):
-		data = self.columns(files)
+	def SqlmapFile(self, files, table, columns=None):
+		data = columns if columns else self.columns(files)
 		sql = '''CREATE TABLE IF NOT EXISTS `{0}` (`id` int(11) NOT NULL AUTO_INCREMENT,'''.format(table)
 		for line in data:
 			if line == 'id':
@@ -128,12 +128,13 @@ class File2Mysql:
 	ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=latin1;
 		'''.strip()
 		sql = "{0}{1}".format(sql, suffix)
+		self.conn = MysqlImport(host='virtual.ub',user='mysql', passwd='mysql123', db='searchku')
 		self.conn.executeInsert(sql) # TODO 打印信息
 		logging.info("CREATE table  success")
 		self.insertsql(files, table)
 		logging.info("done!!!")
 
-	def insertsql(self,files, table):
+	def insertsql(self,files, table, columns=None):
 		sql = "insert into `{0}`(".format(table)
 		temp = ""
 		i = idpos = 0  # 在这里为1是判断是否为第一行
@@ -152,12 +153,26 @@ class File2Mysql:
 							logging.warning("drop the `id` line ")
 							continue
 						temp += "\"{0}\",".format(self.ReplaceAll(value)) #把值排好
+					elif columns != None and type(columns) == list:  #判断是否存在自定义列名	
+						for column  in columns:
+							sql += "`{0}`,".format(column) 
+						break
 					else:
-						sql += "`{0}`,".format(self.ReplaceAll(value))  #第一次循环的时候 把columns排好
+						sql += "`{0}`,".format(self.ReplaceAll(value)) 
 				if i >0 :
 					tmp = "{0})".format(temp[:-1]) #最后闭合括号
 					self.conn.executeInsert(tmp)  #mysql import todo 打印信息
 				i += 1
+
+
+	def DiyColumns(self):
+		columns = []
+		if options.column == None:
+			return None
+		else:
+			for line in options.column.split(options.split):
+				columns.append(line)
+			self.SqlmapFile(options.file, name, columns)
 
 	def usage(self):
 		parser = OptionParser()  
@@ -196,10 +211,13 @@ class File2Mysql:
 		else:
 			name = options.name
 		if options.type == 'other':
-			self.MixFile(options.file, name)
+			if options.column == None:
+				self.MixFile(options.file, name)
+			else:
+				self.DiyColumns()
 		else:
 			self.SqlmapFile(options.file, name)
 
 if __name__ == '__main__':
 	a = File2Mysql()
-	a.main()
+	sys.exit(a.main())
